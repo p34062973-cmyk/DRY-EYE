@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>שאלון OSDI — הערכת עיניות יבשות</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
+    background: #f5f5f7; color: #1d1d1f;
+    direction: rtl; min-height: 100vh; padding: 24px 16px;
+  }
+  .card {
+    background: #fff; border-radius: 16px; max-width: 640px;
+    margin: 0 auto; padding: 28px 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  .header { text-align: center; margin-bottom: 28px; }
+  .header h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .header p { font-size: 14px; color: #6e6e73; }
+  .patient-fields { margin-bottom: 24px; display: grid; gap: 14px; }
+  .field-wrap label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #3c3c43; }
+  .field-wrap input {
+    width: 100%; padding: 11px 14px; font-size: 15px;
+    border: 1px solid #d1d1d6; border-radius: 10px;
+    background: #fff; color: #1d1d1f; outline: none;
+    transition: border-color 0.15s; direction: rtl;
+  }
+  .field-wrap input:focus { border-color: #007aff; }
+  .field-wrap input.invalid { border-color: #ff3b30; }
+  .section-title {
+    font-size: 15px; font-weight: 600; margin: 24px 0 4px;
+    padding-bottom: 8px; border-bottom: 1px solid #e5e5ea;
+  }
+  .section-sub { font-size: 13px; color: #6e6e73; margin-bottom: 14px; }
+  .q-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid #f2f2f7; flex-wrap: wrap;
+  }
+  .q-text { flex: 1; min-width: 150px; font-size: 14px; padding-top: 4px; }
+  .q-options { display: flex; gap: 6px; flex-wrap: wrap; }
+  .q-btn {
+    font-size: 12px; padding: 6px 10px;
+    border: 1px solid #d1d1d6; border-radius: 8px;
+    background: #fff; color: #3c3c43;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .q-btn:hover { background: #f2f2f7; }
+  .q-btn.selected { background: #007aff; color: #fff; border-color: #007aff; }
+  .submit-btn {
+    display: block; width: 100%; margin-top: 24px; padding: 14px;
+    font-size: 16px; font-weight: 600; background: #007aff;
+    color: #fff; border: none; border-radius: 12px;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .submit-btn:hover { background: #0066dd; }
+  .submit-btn:disabled { background: #a1a1a6; cursor: not-allowed; }
+  .error-msg { font-size: 13px; color: #ff3b30; margin-top: 10px; text-align: center; display: none; }
+  #result-section { display: none; text-align: center; }
+  .score-circle {
+    width: 120px; height: 120px; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; margin: 24px auto 16px; border: 4px solid;
+  }
+  .score-num { font-size: 36px; font-weight: 700; }
+  .score-lbl { font-size: 12px; color: #6e6e73; }
+  .patient-name-result { font-size: 16px; color: #6e6e73; margin-bottom: 4px; }
+  .score-interp { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .score-desc {
+    font-size: 14px; color: #6e6e73; line-height: 1.7;
+    margin: 0 auto 20px; max-width: 420px;
+  }
+  .note-box {
+    background: #f2f2f7; border-radius: 10px;
+    padding: 12px 16px; font-size: 13px; color: #6e6e73; text-align: right;
+  }
+  .severity-bar { display: flex; gap: 4px; margin: 12px auto; justify-content: center; max-width: 340px; }
+  .sev-seg { height: 8px; flex: 1; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div id="form-section">
+    <div class="header">
+      <h1>שאלון OSDI</h1>
+      <p>Ocular Surface Disease Index<br>הערכת תסמיני עיניות יבשות</p>
+    </div>
+
+    <div class="patient-fields">
+      <div class="field-wrap">
+        <label for="patient-name">שם מלא</label>
+        <input type="text" id="patient-name" placeholder="ישראל ישראלי" autocomplete="name">
+      </div>
+      <div class="field-wrap">
+        <label for="patient-phone">מספר טלפון</label>
+        <input type="tel" id="patient-phone" placeholder="050-0000000" autocomplete="tel">
+      </div>
+    </div>
+
+    <div id="questions"></div>
+    <p class="error-msg" id="err-msg">אנא מלא שם, טלפון וענה על כל השאלות</p>
+    <button class="submit-btn" id="submit-btn" onclick="submitForm()">סיום ומעבר לתוצאות</button>
+  </div>
+
+  <div id="result-section">
+    <div class="patient-name-result" id="result-name"></div>
+    <div class="score-circle" id="score-circle">
+      <span class="score-num" id="score-num">0</span>
+      <span class="score-lbl">ציון OSDI</span>
+    </div>
+    <div class="severity-bar" id="sev-bar"></div>
+    <div class="score-interp" id="score-interp"></div>
+    <div class="score-desc" id="score-desc"></div>
+    <div class="note-box" id="sheets-note">שולח תוצאות לרישום...</div>
+  </div>
+</div>
+
+<script>
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycby7yKTlqtiRMchgHnjjKd5mdUsmnmBzUVSk-ReNo7edtrXfT2MSmGH-sy4LFDQev44C/exec';
+
+const QUESTIONS = [
+  { id:'q1',  text:'עיניים רגישות לאור',           sec:null },
+  { id:'q2',  text:'תחושת גרגיר או חול בעיניים',   sec:null },
+  { id:'q3',  text:'כאב או צריבה בעיניים',         sec:null },
+  { id:'q4',  text:'ראייה מטושטשת',                sec:null },
+  { id:'q5',  text:'ראייה ירודה',                  sec:null },
+  { id:'q6',  text:'קריאה',                        sec:'ב' },
+  { id:'q7',  text:'נהיגה בלילה',                  sec:null, na:true },
+  { id:'q8',  text:'עבודה מול מחשב או מסך',        sec:null, na:true },
+  { id:'q9',  text:'צפייה בטלוויזיה',              sec:null },
+  { id:'q10', text:'אזורים עם מיזוג אוויר',        sec:'ג' },
+  { id:'q11', text:'אזורים יבשים',                 sec:null },
+  { id:'q12', text:'אזורים עם רוח',                sec:null },
+];
+
+const SEC = {
+  'ב': { title:'חלק ב׳ — פעילויות יומיות', sub:'האם הייתה לך בעיה בפעילויות הבאות בשבוע האחרון בגלל עיניות?' },
+  'ג': { title:'חלק ג׳ — גורמים סביבתיים', sub:'האם עיניך הרגישו לא נוח ב...' }
+};
+
+const OPTS = ['אף פעם','לעיתים רחוקות','לפעמים','לרוב','תמיד'];
+const answers = {};
+
+function renderQuestions() {
+  const c = document.getElementById('questions');
+  let curSec = null;
+  let html = '<div class="section-title">חלק א׳ — תסמינים</div><div class="section-sub">באיזו תדירות חווית את הסימפטומים הבאים במהלך השבוע האחרון?</div>';
+  QUESTIONS.forEach((q, i) => {
+    if (q.sec && q.sec !== curSec) {
+      curSec = q.sec;
+      html += `<div class="section-title">${SEC[curSec].title}</div><div class="section-sub">${SEC[curSec].sub}</div>`;
+    }
+    const btns = OPTS.map((o, vi) =>
+      `<button class="q-btn" data-id="${q.id}" data-val="${vi}" onclick="pick(this,'${q.id}',${vi})">${o}</button>`
+    ).join('');
+    const na = q.na ? `<button class="q-btn" data-id="${q.id}" data-val="-1" onclick="pick(this,'${q.id}',-1)">לא רלוונטי</button>` : '';
+    html += `<div class="q-row"><div class="q-text">${i+1}. ${q.text}</div><div class="q-options">${btns}${na}</div></div>`;
+  });
+  c.innerHTML = html;
+}
+
+function pick(btn, id, val) {
+  document.querySelectorAll(`.q-btn[data-id="${id}"]`).forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  answers[id] = val;
+}
+
+function calcScore() {
+  let sum = 0, count = 0;
+  QUESTIONS.forEach(q => {
+    const v = answers[q.id];
+    if (v !== undefined && v !== -1) { sum += v; count++; }
+  });
+  return count === 0 ? 0 : Math.round((sum / (count * 4)) * 100);
+}
+
+function getSeverity(score) {
+  if (score <= 12) return { label:'תקין',   color:'#34c759', desc:'לא נמצאו תסמינים משמעותיים של עיניות יבשות. מומלץ לעקוב ולחזור אם יופיעו תסמינים.' };
+  if (score <= 22) return { label:'קל',     color:'#ff9500', desc:'תסמינים קלים של עיניות יבשות. ניתן להתחיל טיפול בדמעות מלאכותיות ולעקוב.' };
+  if (score <= 32) return { label:'בינוני', color:'#ff6b00', desc:'תסמינים בינוניים. מומלץ הערכה מקיפה ושקילת טיפול תרופתי.' };
+  return              { label:'חמור',   color:'#ff3b30', desc:'תסמינים חמורים. מומלץ להתחיל טיפול בהקדם ולעקוב מקרוב.' };
+}
+
+function submitForm() {
+  const name  = document.getElementById('patient-name').value.trim();
+  const phone = document.getElementById('patient-phone').value.trim();
+  const missing = QUESTIONS.filter(q => answers[q.id] === undefined);
+
+  document.getElementById('patient-name').classList.toggle('invalid', !name);
+  document.getElementById('patient-phone').classList.toggle('invalid', !phone);
+
+  if (!name || !phone || missing.length > 0) {
+    document.getElementById('err-msg').style.display = 'block';
+    return;
+  }
+  document.getElementById('err-msg').style.display = 'none';
+  document.getElementById('submit-btn').disabled = true;
+
+  const score = calcScore();
+  const sev   = getSeverity(score);
+  showResult(score, sev, name);
+  sendToSheets(score, sev.label, name, phone);
+}
+
+function showResult(score, sev, name) {
+  document.getElementById('form-section').style.display = 'none';
+  document.getElementById('result-section').style.display = 'block';
+  document.getElementById('result-name').textContent = name;
+  const circle = document.getElementById('score-circle');
+  circle.style.borderColor = sev.color;
+  document.getElementById('score-num').style.color = sev.color;
+  document.getElementById('score-num').textContent = score;
+  document.getElementById('score-interp').textContent = sev.label;
+  document.getElementById('score-interp').style.color = sev.color;
+  document.getElementById('score-desc').textContent = sev.desc;
+
+  const segs = [
+    { label:'תקין', color:'#34c759' },
+    { label:'קל',   color:'#ff9500' },
+    { label:'בינוני', color:'#ff6b00' },
+    { label:'חמור', color:'#ff3b30' },
+  ];
+  document.getElementById('sev-bar').innerHTML = segs.map(s =>
+    `<div class="sev-seg" style="background:${s.color};opacity:${sev.label===s.label?1:0.25}"></div>`
+  ).join('');
+}
+
+function sendToSheets(score, severity, name, phone) {
+  const note = document.getElementById('sheets-note');
+  fetch(SHEET_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      timestamp: new Date().toLocaleString('he-IL'),
+      name, phone, score, severity,
+      answers: JSON.stringify(answers)
+    })
+  })
+  .then(() => { note.textContent = 'התוצאה נשמרה בהצלחה ברשומות המרפאה'; })
+  .catch(() => { note.textContent = 'שגיאה בשמירה — בדוק חיבור אינטרנט'; });
+}
+
+renderQuestions();
+</script>
+</body>
+</html>
